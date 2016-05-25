@@ -3,7 +3,7 @@ project (isaacrng)
 
 SET (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 
-find_package (OpenCV REQUIRED)
+find_package (OpenCV REQUIRED core imgproc highgui)
 find_package (Crypto++ REQUIRED)
 find_package (Portaudio REQUIRED)
 
