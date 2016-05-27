@@ -172,6 +172,17 @@ public:
 	 */
 	void InitializeEncryption(const std::vector<uint8_t>& key);
 
+	// ---------
+	// SaveState
+	// ---------
+
+	/**
+	 * @brief Encrypts and saves the RNG state to the disk.
+	 *
+	 * @return an enum of type STATUS
+	 */
+	STATUS SaveState();
+
 	// -------
 	// Destroy
 	// -------
