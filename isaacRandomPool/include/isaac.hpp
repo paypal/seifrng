@@ -171,6 +171,17 @@ template <int ALPHA = (8), class T = ISAAC_INT>
        */
       int initialize(const std::string& file, std::vector<uint8_t> key);
 
+      // ---------
+      // saveState
+      // ---------
+
+      /**
+       * @brief Encrypts and saves the current RNG state to disk.
+       *
+       * @return bool true, if saving the state is successful, false if not
+       */
+      bool saveState();
+
       // -------
       // destroy
       // -------
@@ -608,6 +619,26 @@ template<int ALPHA, class T>
     return loadStateFromFile(newStateFileName, key);
   }
 
+  // ---------
+  // saveState
+  // ---------
+
+  /**
+   * @brief Encrypts and saves the current RNG state to disk.
+   *
+   * @return bool true, if saving the state is successful, false if not
+   */
+  template<int ALPHA, class T>
+  bool QTIsaac<ALPHA,T>::saveState() {
+    // Check if internal state exists.
+    if (_initialized) {
+      // Save internal state to file.
+      return saveStateToFile();
+    }
+
+    return false;
+  }
+
   // -------
   // destroy
   // -------
@@ -668,9 +699,7 @@ template<int ALPHA, class T>
       ++oit;
 
       // Write to file, a valid key will encrypt before writing to file.
-      fileEncryptor.writeFile(fileStream, _key);
-
-      return true;
+      return fileEncryptor.writeFile(fileStream, _key);
   }
 
   // -----------------

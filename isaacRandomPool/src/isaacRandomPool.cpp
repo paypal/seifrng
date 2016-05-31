@@ -239,6 +239,28 @@ void IsaacRandomPool::InitializeEncryption(const std::vector<uint8_t>& key) {
 	_isaacrng.setKey(key);
 }
 
+
+// ---------
+// SaveState
+// ---------
+
+/**
+ * @brief Encrypts and saves the RNG state to the disk.
+ *
+ * @return an enum of type STATUS
+ */
+IsaacRandomPool::STATUS IsaacRandomPool::SaveState() {
+	// Save the state to the disk and return the status.
+	bool status = _isaacrng.saveState();
+
+	if (status == true) {
+		return STATUS::SUCCESS;
+	}
+
+	return STATUS::RNG_INIT_ERROR;
+}
+
+
 // -------
 // Destroy
 // -------
