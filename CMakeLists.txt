@@ -1,24 +1,46 @@
 cmake_minimum_required (VERSION 2.8)
 project (isaacrng)
+include (ExternalProject)
 
 SET (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 
-find_package (OpenCV REQUIRED core imgproc highgui)
-find_package (Crypto++ REQUIRED)
-find_package (Portaudio REQUIRED)
+FIND_PACKAGE (OpenCV QUIET core imgproc highgui)
+FIND_PACKAGE (Crypto++ QUIET)
+FIND_PACKAGE (Portaudio QUIET)
+
+IF ((NOT CRYPTO++_FOUND) OR (NOT (CRYPTO++_VERSION VERSION_EQUAL 5.6.5)))
+	ExternalProject_Add(
+		cryptopp
+		SVN_REPOSITORY "https://svn.code.sf.net/p/cryptopp/code/tags/CRYPTOPP_5_6_5/c5"
+		SOURCE_DIR "${CMAKE_SOURCE_DIR}/3rdParty/cryptopp"
+		BUILD_IN_SOURCE 1
+		INSTALL_COMMAND cmake -E echo "Skipping install step."
+	)
+	SET (CRYPTO++_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/3rdParty/cryptopp)
+	SET (CRYPTO++_LIBRARIES ${CMAKE_SOURCE_DIR}/3rdParty/cryptopp/libcryptopp.a)
+	SET (CRYPTO++_FOUND TRUE)
+	MESSAGE (STATUS "Found Crypto++: ${CRYPTO++_INCLUDE_DIR}, ${CRYPTO++_LIBRARIES}")
+ENDIF ((NOT CRYPTO++_FOUND) OR (NOT (CRYPTO++_VERSION VERSION_EQUAL 5.6.5)))
 
 SET (CMAKE_CXX_FLAGS "-fPIC -std=c++11")
 
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
-	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+	SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+	SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 
-enable_testing()
+ENABLE_TESTING()
 
-add_subdirectory (interfaceOSRNG)
-add_subdirectory (interfaceCamera)
-add_subdirectory (interfaceMicrophone)
-add_subdirectory (fileCryptopp)
-add_subdirectory (seedGenerator)
-add_subdirectory (isaacRandomPool)
+ADD_SUBDIRECTORY (interfaceOSRNG)
+
+IF (OpenCV_FOUND)
+	ADD_SUBDIRECTORY (interfaceCamera)
+ENDIF (OpenCV_FOUND)
+
+IF (PORTAUDIO_FOUND)
+	ADD_SUBDIRECTORY (interfaceMicrophone)
+ENDIF (PORTAUDIO_FOUND)
+
+ADD_SUBDIRECTORY (fileCryptopp)
+ADD_SUBDIRECTORY (seedGenerator)
+ADD_SUBDIRECTORY (isaacRandomPool)
