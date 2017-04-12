@@ -4,7 +4,7 @@ include (ExternalProject)
 
 SET (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 
-FIND_PACKAGE (OpenCV QUIET)
+FIND_PACKAGE (OpenCV QUIET core imgproc highgui)
 FIND_PACKAGE (Crypto++ QUIET)
 FIND_PACKAGE (Portaudio QUIET)
 
