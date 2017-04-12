@@ -6,27 +6,27 @@
  *
  *  @author Aashish Sheshadri
  *  @author Rohit Harchandani
- *  
+ *
  *  The MIT License (MIT)
- *  
- *  Copyright (c) 2015 PayPal
- *  
+ *
+ *  Copyright (c) 2015, 2016, 2017 PayPal
+ *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to 
- *  deal in the Software without restriction, including without limitation the 
- *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
- *  
+ *
  *  The above copyright notice and this permission notice shall be included in
  *  all copies or substantial portions of the Software.
- *  
+ *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
- *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER  
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  *  DEALINGS IN THE SOFTWARE.
  */
 
@@ -111,6 +111,21 @@ public:
 	 */
 	void GenerateBlock(byte *output, size_t size);
 
+	// ---------------
+	// EntropyStrength
+	// ---------------
+
+	/**
+	 * @brief Returns the possible strength of entropy avaible for mining.
+	 *
+	 * @return A string with values "WEAK", "MEDIUM" or "STRONG". If the only
+	 *		   source of entropy is the OS this makes the module's strength
+	 *		   WEAK w.r.t entropy, access to either the microphone or camera
+	 *		   results in Medium strength and finally access to the OS, camera,
+	 *		   microphone and more enables STRONG strength.
+	 */
+	std::string EntropyStrength();
+
 	// -------------
 	// IsInitialized
 	// -------------
@@ -171,6 +186,17 @@ public:
 	 * @return void
 	 */
 	void InitializeEncryption(const std::vector<uint8_t>& key);
+
+	// ---------
+	// SaveState
+	// ---------
+
+	/**
+	 * @brief Encrypts and saves the RNG state to the disk.
+	 *
+	 * @return an enum of type STATUS
+	 */
+	STATUS SaveState();
 
 	// -------
 	// Destroy
@@ -246,7 +272,7 @@ void IsaacRandomPool::int32toBytes(II begin, II end, OI out){
 		// Extract four bytes from int32.
 		for (int i = 0; i<4; ++i) {
 			*out = static_cast<uint8_t>(
-				(*begin & (0x000000FF << (8 * i))) >> (8 * i)
+				(*begin & (uint32_t(0x000000FF) << (8 * i))) >> (8 * i)
 			);
 			++out;
 		}

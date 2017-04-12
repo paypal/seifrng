@@ -3,27 +3,27 @@
  *
  *  @author Aashish Sheshadri
  *  @author Rohit Harchandani
- *  
+ *
  *  The MIT License (MIT)
- *  
- *  Copyright (c) 2015 PayPal
- *  
+ *
+ *  Copyright (c) 2015, 2016, 2017 PayPal
+ *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to 
- *  deal in the Software without restriction, including without limitation the 
- *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
- *  
+ *
  *  The above copyright notice and this permission notice shall be included in
  *  all copies or substantial portions of the Software.
- *  
+ *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
- *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER  
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  *  DEALINGS IN THE SOFTWARE.
  */
 
@@ -43,9 +43,19 @@
 // ----------------
 #include "isaacRandomPool.h"
 #include "seedGenerator.h"
-#include "interfaceCamera.h"
 #include "interfaceOSRNG.h"
+#include "interfaceCamera.h"
 #include "interfaceMicrophone.h"
+
+#ifndef WITH_OPENCV
+	#define WITH_OPENCV 0
+#endif
+
+#ifndef WITH_PORTAUDIO
+	#define WITH_PORTAUDIO 0
+#endif
+
+
 
 // -------------
 // GenerateBlock
@@ -126,6 +136,32 @@ void IsaacRandomPool::GenerateBlock(byte *output, size_t size) {
 	}
 
 }
+
+// ---------------
+// EntropyStrength
+// ---------------
+
+/**
+ * @brief Returns the possible strength of entropy avaible for mining.
+ *
+ * @return A string with values "WEAK", "MEDIUM" or "STRONG". If the only
+ *		   source of entropy is the OS this makes the module's strength
+ *		   WEAK w.r.t entropy, access to either the microphone or camera
+ *		   results in Medium strength and finally access to the OS, camera,
+ *		   microphone and more enables STRONG strength.
+ */
+std::string IsaacRandomPool::EntropyStrength() {
+	if (WITH_OPENCV && WITH_PORTAUDIO) {
+		return "STRONG";
+	}
+
+	if (WITH_OPENCV || WITH_PORTAUDIO) {
+		return "MEDIUM";
+	}
+
+	return "WEAK";
+}
+
 
 // -------------
 // IsInitialized
@@ -239,6 +275,28 @@ void IsaacRandomPool::InitializeEncryption(const std::vector<uint8_t>& key) {
 	_isaacrng.setKey(key);
 }
 
+
+// ---------
+// SaveState
+// ---------
+
+/**
+ * @brief Encrypts and saves the RNG state to the disk.
+ *
+ * @return an enum of type STATUS
+ */
+IsaacRandomPool::STATUS IsaacRandomPool::SaveState() {
+	// Save the state to the disk and return the status.
+	bool status = _isaacrng.saveState();
+
+	if (status == true) {
+		return STATUS::SUCCESS;
+	}
+
+	return STATUS::RNG_INIT_ERROR;
+}
+
+
 // -------
 // Destroy
 // -------
@@ -272,71 +330,164 @@ void IsaacRandomPool::Destroy() {
 bool IsaacRandomPool::GatherEntropyAndSeed(int multiplier) {
 
 	bool status;
+	bool result;
 
-	// Set up microphone to record samples.
-	InterfaceMicrophone interfaceMicrophone;
+	/* Setup SeedGenerator to generate a seed of length SEEDTERMS.
+	 * Paramter to the constructor determintes number of splits to data
+	 * collected to generate independent hashes to fill SEEDTERMS i.e.
+	 * 2 splits => 2 hashes of 512 bytes => 32, 32bit terms or 64, 16bit terms
+	 * and so on.
+	 */
+	SeedGenerator seedGenerator(IsaacRandomPool::ENTROPYSPLIT);
 
-	// Start recording and collecting data (async).
-    status = interfaceMicrophone.initFlow();
+	/* Check if access to the microphone is possible.
+	 * If Not check if the camera is accessible.
+	 * Rely on the OS for any compensation.
+	 */
+	if (WITH_PORTAUDIO == 1) {
 
-    if(!status) {
-    	throw std::runtime_error("Cannot open microphone device.");
-    }
+		// Set result to true initially.
+		result = true;
 
-    /* Setup SeedGenerator to generate a seed of length SEEDTERMS.
-     * Paramter to the constructor determintes number of splits to data
-     * collected to generate independent hashes to fill SEEDTERMS i.e.
-     * 2 splits => 2 hashes of 512 bytes => 32, 32bit terms or 64, 16bit terms
-     * and so on.
-     */
-    SeedGenerator seedGenerator(IsaacRandomPool::ENTROPYSPLIT);
+		// Set up microphone to record samples.
+		InterfaceMicrophone interfaceMicrophone;
 
-    // Set up camera to record samples.
-    InterfaceCamera interfaceCamera;
+		// Start recording and collecting data (async).
+	    status = interfaceMicrophone.initFlow();
 
-    // Set up OS rng to record samples.
-    InterfaceOSRNG interfaceOSRNG;
+	    if(!status) {
+	    	throw std::runtime_error("Cannot open microphone device.");
+	    }
 
-    // Capture samples from camera, increase num samples as an exponent of 2
-    // determined by multiplier.
-    status = interfaceCamera.captureFrames(
-    	IsaacRandomPool::NUM_CAPTURE_FRAMES
-    	* std::pow(2,multiplier)
-	);
+		// Access more entropy from OS if neccessary.
+		int entropyCompensation = 0;
 
-	if(!status) {
-    	throw std::runtime_error("Cannot open camera device.");
-    }
+		// Check if access to camera is possible.
+		if (WITH_OPENCV == 1) {
+			// Set up camera to record samples.
+			InterfaceCamera interfaceCamera;
 
-    // Capture bytes from os randomness, increase num samples as an exponent
-    // of 2 determined by multiplier.
-    status = interfaceOSRNG.generateRandomBytes(
-    	IsaacRandomPool::NUM_OS_RANDOM_BYTES
-    	* std::pow(2,multiplier)
-    );
+			// Capture samples from camera, increase num samples as an exponent of 2
+		    // determined by multiplier.
+		    status = interfaceCamera.captureFrames(
+		    	IsaacRandomPool::NUM_CAPTURE_FRAMES
+		    	* std::pow(2, multiplier)
+			);
 
-    if(!status) {
-    	throw std::runtime_error("Cannot tap OS entropy.");
-    }
+			if(!status) {
+		    	throw std::runtime_error("Cannot open camera device.");
+		    }
 
-    // Sleep to gather more samples from microphone.
-    Pa_Sleep(IsaacRandomPool::NUM_MIC_SLEEP_MS);
+			result = seedGenerator.processFromSource(&interfaceCamera);
+		} else {
+			entropyCompensation = 1;
+		}
 
-    // Stop listening on the microphone.
-    interfaceMicrophone.stopFlow();
+		// Set up OS rng to record samples.
+		InterfaceOSRNG interfaceOSRNG;
 
-    /* Load data from sources as random bytes to seedGenerator.
-     * A false result indicates the source failed to gather sufficient entropy.
-     */
-    bool result = seedGenerator.processFromSource(&interfaceOSRNG);
-    result = result && seedGenerator.processFromSource(&interfaceCamera);
-    result = result && seedGenerator.processFromSource(&interfaceMicrophone);
+		// Capture bytes from os randomness, increase num samples as an exponent
+		// of 2 determined by multiplier.
+		status = interfaceOSRNG.generateRandomBytes(
+			IsaacRandomPool::NUM_OS_RANDOM_BYTES
+			* std::pow(2, multiplier + entropyCompensation)
+		);
 
-    // Check if data is entropic enough.
-    if (!result) {
-    	// Not enough entropy.
-    	return false;
-    }
+		if(!status) {
+			throw std::runtime_error("Cannot tap OS entropy.");
+		}
+
+	    // Sleep to gather more samples from microphone.
+	    Pa_Sleep(IsaacRandomPool::NUM_MIC_SLEEP_MS);
+
+	    // Stop listening on the microphone.
+	    interfaceMicrophone.stopFlow();
+
+	    /* Load data from sources as random bytes to seedGenerator.
+	     * A false result indicates the source failed to gather sufficient entropy.
+	     */
+	    result = result && seedGenerator.processFromSource(&interfaceOSRNG);
+	    result = result && seedGenerator.processFromSource(&interfaceMicrophone);
+
+	    // Check if data is entropic enough.
+	    if (!result) {
+	    	// Not enough entropy.
+	    	return false;
+	    }
+	} else if (WITH_OPENCV == 1) {
+
+		// Access more entropy from OS if neccessary.
+		int entropyCompensation = 1;
+
+		// Set up camera to record samples.
+		InterfaceCamera interfaceCamera;
+
+		// Capture samples from camera, increase num samples as an exponent of 2
+	    // determined by multiplier.
+	    status = interfaceCamera.captureFrames(
+	    	IsaacRandomPool::NUM_CAPTURE_FRAMES
+	    	* std::pow(2, multiplier)
+		);
+
+		if(!status) {
+	    	throw std::runtime_error("Cannot open camera device.");
+	    }
+
+		// Set up OS rng to record samples.
+		InterfaceOSRNG interfaceOSRNG;
+
+		// Capture bytes from os randomness, increase num samples as an exponent
+		// of 2 determined by multiplier.
+		status = interfaceOSRNG.generateRandomBytes(
+			IsaacRandomPool::NUM_OS_RANDOM_BYTES
+			* std::pow(2, multiplier + entropyCompensation)
+		);
+
+		if(!status) {
+			throw std::runtime_error("Cannot tap OS entropy.");
+		}
+
+	    /* Load data from sources as random bytes to seedGenerator.
+	     * A false result indicates the source failed to gather sufficient entropy.
+	     */
+		result = seedGenerator.processFromSource(&interfaceCamera);
+	    result = result && seedGenerator.processFromSource(&interfaceOSRNG);
+
+	    // Check if data is entropic enough.
+	    if (!result) {
+	    	// Not enough entropy.
+	    	return false;
+	    }
+	} else {
+
+		// Access more entropy from OS if neccessary.
+		int entropyCompensation = 2;
+
+		// Set up OS rng to record samples.
+		InterfaceOSRNG interfaceOSRNG;
+
+		// Capture bytes from os randomness, increase num samples as an exponent
+		// of 2 determined by multiplier.
+		status = interfaceOSRNG.generateRandomBytes(
+			IsaacRandomPool::NUM_OS_RANDOM_BYTES
+			* std::pow(2, multiplier + entropyCompensation)
+		);
+
+		if(!status) {
+			throw std::runtime_error("Cannot tap OS entropy.");
+		}
+
+	    /* Load data from sources as random bytes to seedGenerator.
+	     * A false result indicates the source failed to gather sufficient entropy.
+	     */
+	    result = seedGenerator.processFromSource(&interfaceOSRNG);
+
+	    // Check if data is entropic enough.
+	    if (!result) {
+	    	// Not enough entropy.
+	    	return false;
+	    }
+	}
 
     uint32_t seed[IsaacRandomPool::SEEDTERMS];
 
@@ -354,5 +505,3 @@ bool IsaacRandomPool::GatherEntropyAndSeed(int multiplier) {
 
     return result;
 }
-
-
