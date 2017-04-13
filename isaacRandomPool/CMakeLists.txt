@@ -1,12 +1,9 @@
 INCLUDE_DIRECTORIES (${CMAKE_CURRENT_SOURCE_DIR}/include
 					 ${PROJECT_SOURCE_DIR}/interfaceOSRNG/include
-					 ${PROJECT_SOURCE_DIR}/interfaceCamera/include
-					 ${PROJECT_SOURCE_DIR}/interfaceMicrophone/include ${PROJECT_SOURCE_DIR}/seedGenerator/include
+					 ${PROJECT_SOURCE_DIR}/seedGenerator/include
 					 ${PROJECT_SOURCE_DIR}/commonInclude
 					 ${PROJECT_SOURCE_DIR}/fileCryptopp/include
-					 ${CRYPTO++_INCLUDE_DIR}
-					 ${PORTAUDIO_INCLUDE_DIRS}
-					 ${OpenCV_INCLUDE_DIR})
+					 ${CRYPTO++_INCLUDE_DIR})
 
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	SET(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS true)
@@ -36,10 +33,14 @@ SET (CMAKE_INSTALL_PATH "${PROJECT_SOURCE_DIR}/lib")
 
 IF (OpenCV_FOUND)
 	ADD_DEFINITIONS(-DWITH_OPENCV=1)
+	INCLUDE_DIRECTORIES (${PROJECT_SOURCE_DIR}/interfaceCamera/include
+						 ${OpenCV_INCLUDE_DIR})
 ENDIF (OpenCV_FOUND)
 
 IF (PORTAUDIO_FOUND)
 	ADD_DEFINITIONS(-DWITH_PORTAUDIO=1)
+	INCLUDE_DIRECTORIES (${PROJECT_SOURCE_DIR}/interfaceMicrophone/include
+						 ${PORTAUDIO_INCLUDE_DIRS})
 ENDIF (PORTAUDIO_FOUND)
 
 # build and link library

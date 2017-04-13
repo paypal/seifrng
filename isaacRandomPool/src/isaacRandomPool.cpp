@@ -44,15 +44,19 @@
 #include "isaacRandomPool.h"
 #include "seedGenerator.h"
 #include "interfaceOSRNG.h"
-#include "interfaceCamera.h"
-#include "interfaceMicrophone.h"
 
 #ifndef WITH_OPENCV
 	#define WITH_OPENCV 0
+	#include "ignoreCamera.hpp"
+#else
+	#include "interfaceCamera.h"
 #endif
 
 #ifndef WITH_PORTAUDIO
 	#define WITH_PORTAUDIO 0
+	#include "ignoreMicrophone.hpp"
+#else
+	#include "interfaceMicrophone.h"
 #endif
 
 
